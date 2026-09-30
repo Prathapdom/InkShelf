@@ -1,0 +1,76 @@
+## .NET / Visual Studio
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+artifacts/
+
+# Build logs
+[Ll]og/
+[Ll]ogs/
+*.log
+*.binlog
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+*.nuget.props
+*.nuget.targets
+project.lock.json
+
+# MSIX packaging output
+AppPackages/
+BundleArtifacts/
+*.msix
+*.msixupload
+*.appx
+*.appxbundle
+*.appxupload
+
+# Publish output
+publish/
+publish-*/
+*.pubxml
+PublishScripts/
+
+# Provisioned offline ML runtime and models
+TranslationRuntime/
+TranslationModels/
+python-*-amd64.exe
+
+# Code analysis and tooling
+_ReSharper*/
+*.DotSettings.user
+*.dotCover
+.idea/
+.tools/
+
+# Generated files
+Generated\ Files/
+*_wpftmp.csproj
+
+# Local build/test artifacts (not part of the source)
+output/
+TestRunData/
+DeploySmokeData/
+TestData/Cache/
+TranslationUiData/Cache/
+__pycache__/
+*.pyc
+*.tmp
+# Old local verification captures (replaced by docs/screenshots)
+ui-*.png
+
+# Per-machine library state (contains absolute local paths)
+**/library.json
