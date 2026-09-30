@@ -1,63 +1,92 @@
 # InkShelf
 
-InkShelf is a local-first CBZ comic reader for Windows, built with the same stack as BudgetBook: **.NET 8 + WinUI 3 (Windows App SDK)**.
+A local-first CBZ comic and manga reader for Windows, built with **C# / .NET 8 and WinUI 3 (Windows App SDK)**.
+It covers the library, reading modes, progress tracking and fully offline Japanese-to-English page translation. Your comics and reading data never leave the PC.
+
+![Library](docs/screenshots/library.png)
 
 ## Features
 
-- Import one or many `.cbz` files, or recursively scan a folder.
-- Add a WeebCentral series URL, browse its current chapter list, and read chapters in an embedded WebView.
-- A cover-first library with search, sorting, recent reading, and favorites filtering.
-- Automatic reading-progress persistence in `%LOCALAPPDATA%\InkShelf\library.json`.
-- Managed offline copies of imported comics in `%LOCALAPPDATA%\InkShelf\Comics`.
-- Single-page, two-page spread, and vertical-scroll layouts.
-- Manga direction, night dimming, zoom, page scrubber, full screen, and keyboard navigation.
-- Persistent System, Light, Dark, and pure-black Midnight (OLED) themes with Coral, Ocean, Emerald, and Violet accents.
-- Remembered page-turn animation options: None, Fade, Slide, and a 3D Page Turn.
-- Optional AniList tracking with browser OAuth, secure Windows Credential Locker token storage, title matching, chapter/volume mapping, and an offline retry queue.
-- Automatic chapter metadata import from `ComicInfo.xml` when it is present in a CBZ.
-- Fully local Japanese-to-English page translation with manga-specific OCR, an English reader overlay, and per-page caching.
-- Offline Smart Zoom for speech-bubble magnification and Guided View for animated panel-to-panel reading, with cached manga-aware layout analysis.
-- Natural page sorting (`2.jpg` before `10.jpg`) and guarded archive extraction.
+- **Library**: import one or many `.cbz` files or scan a folder recursively. Cover-first grid with search, sorting, *Continue reading* and favourites.
+- **Reader**: single page, two-page spread and vertical scroll. Manga (right-to-left) direction, zoom, page scrubber, full screen and keyboard navigation.
+- **Page-turn animations**: None, Fade, Slide, or a 3D page curl.
+- **Themes**: System, Light, Dark and a pure-black *Midnight* (OLED) theme, with Coral, Ocean, Emerald and Violet accents. Choices are remembered.
+- **Progress** is saved automatically. `ComicInfo.xml` chapter metadata is read when present. Pages sort naturally (`2.jpg` before `10.jpg`). Archive extraction is guarded: pages are written under generated file names, which prevents path-traversal ("zip slip"), and per-page and total size limits stop zip bombs.
+- **Offline translation (optional)**: manga-specific OCR plus a local Japanese-to-English model show an English transcript for each page. Results are cached per page and nothing is sent to an online service.
+- **Smart Zoom and Guided View**: offline speech-bubble and panel detection gives bubble magnification and panel-by-panel reading, with manga-aware ordering.
+- **AniList tracking (optional)**: browser OAuth sign-in, with the token stored in Windows Credential Locker. Includes title matching, chapter and volume mapping, and an offline retry queue.
+
+![Reader](docs/screenshots/reader.png)
+
+## Tech stack
+
+| Area | Choice |
+|---|---|
+| UI | WinUI 3 (Windows App SDK 2.4), XAML, custom page-curl composition animation |
+| Language | C# 12 / .NET 8, nullable enabled |
+| Storage | JSON library and settings under `%LOCALAPPDATA%\InkShelf`, managed offline copies of imported comics |
+| Security | Windows Credential Locker for the OAuth token; zip-slip and zip-bomb safe extraction |
+| Offline ML | Python worker process (ONNX Runtime, manga-ocr, Argos Translate / CTranslate2, RapidOCR, OpenCV) driven from C# over stdin/stdout |
+| Tracking | Provider-neutral `ITrackerProvider` interface with an AniList implementation |
+
+## Project layout
+
+| Path | Purpose |
+|---|---|
+| `MainWindow.xaml(.cs)`, `MainWindow.PageCurl.cs` | Shell, library, reader and page-turn animation |
+| `Models/` | Comic, translation, speech-bubble and tracking models |
+| `Services/LibraryService.cs` | Import, CBZ extraction, covers, progress persistence |
+| `Services/OfflineTranslationService.cs`, `BubbleZoomService.cs` | Host the offline OCR/translation and bubble/panel analysis workers |
+| `Services/AniListTracker.cs`, `TrackingService.cs` | OAuth sign-in, sync and retry queue |
+| `TranslationEngine/` | Python workers and the model provisioning script |
+| `TestData/` | Three generated sample comics for trying the app |
 
 ## Build and run
 
+**Requirements:** Windows 10 1809 or later (Windows 11 recommended) and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). Visual Studio is optional.
+
 ```powershell
-$env:DOTNET_ROOT="F:\dev\dotnet"
-$env:Path="F:\dev\dotnet;$env:Path"
-$env:NUGET_PACKAGES="F:\dev\nuget\packages"
-dotnet build -c Debug
-& .\bin\Debug\net8.0-windows10.0.26100.0\win-x64\InkShelf.exe
+git clone https://github.com/Prathapdom/InkShelf.git
+cd InkShelf
+
+dotnet build InkShelf.csproj -c Debug -p:Platform=x64
+.\bin\x64\Debug\net8.0-windows10.0.26100.0\win-x64\InkShelf.exe
 ```
 
-## Controls
+The build is self-contained, so the Windows App Runtime does not need to be installed.
 
-- `←` / `→`: turn pages (reversed in manga mode)
-- `Space`: next page, or next panel in Guided View
-- `Esc`: close Bubble Zoom/Guided View, then return to the library
+**Try it with sample comics:** point the app at a throwaway data folder, then use **Import CBZ files** and pick the files in `TestData\Comics`.
 
-The interface is an original Windows design informed by the clean, cover-forward library and configurable reading modes of Panels. No Panels assets or source code are included.
+```powershell
+$env:INKSHELF_DATA_DIR = "$env:TEMP\inkshelf-demo"
+.\bin\x64\Debug\net8.0-windows10.0.26100.0\win-x64\InkShelf.exe
+```
 
-For isolated testing, set `INKSHELF_DATA_DIR` to a temporary directory before launching.
+### Optional: offline translation runtime
 
-## AniList tracking setup
+The reader works without this. To enable **Translate offline**, add a Python 3.11 runtime at `TranslationRuntime\python.exe` next to `InkShelf.exe`, with the packages listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) installed. Then download the models once:
 
-1. Create an API client at `https://anilist.co/settings/developer`.
-2. Set its redirect URL to `http://127.0.0.1:43871/callback`.
-3. In InkShelf, open **Tracking**, enter the numeric client ID, and select **Connect AniList**.
-4. Right-click a comic, choose **Link to AniList…**, select its series, and confirm the chapters/volume contained in that CBZ.
+```powershell
+.\TranslationRuntime\python.exe .\TranslationEngine\provision_models.py .
+```
 
-Tracking is optional and requires internet only while signing in, searching, or synchronizing. Failed updates remain queued locally. MyAnimeList can be added later through the provider-neutral tracking interface after its application credentials are registered.
+This creates `TranslationModels\` (manga-ocr ONNX weights and the Argos ja→en package). After that, translation runs fully offline. The runtime and models are git-ignored because of their size.
 
-## Offline Japanese translation
+### Optional: AniList tracking
 
-When a Japanese or language-unknown CBZ is opened for the first time, InkShelf offers **Translate offline**. The reader then displays an English transcript panel for the current page. Use **Reading options → Offline English translation** to show or hide it, and **Translate again** to replace a cached result.
+1. Create an API client at <https://anilist.co/settings/developer> with the redirect URL `http://127.0.0.1:43871/callback`.
+2. In InkShelf, open **Tracking**, enter the client ID and select **Connect AniList**.
+3. Right-click a comic → **Link to AniList…**
 
-OCR and translation run in the bundled `TranslationRuntime`, using local models in `TranslationModels`. Page text and images are never submitted to an online service. First-page processing includes model startup and can take longer; later pages reuse the running worker, and completed results are cached in `%LOCALAPPDATA%\InkShelf\Translations`.
+## Keyboard
 
-## Smart Zoom and Guided View
+| Key | Action |
+|---|---|
+| `←` / `→` | Previous / next page (reversed in manga mode) |
+| `Space` | Next page, or next panel in Guided View |
+| `Esc` | Close Smart Zoom / Guided View, or return to the library |
 
-Use **Smart Zoom** to analyze the current page or a complete comic. The same completely offline pass finds speech regions and panel boundaries, calculates left-to-right or manga right-to-left order, and stores compact metadata in `%LOCALAPPDATA%\InkShelf\SmartZoom`. Select **Guided View** to read one panel at a time; click the panel or press `Space` to advance. Irregular pages without reliable panel boundaries gracefully fall back to a whole-page step.
+## Notes
 
-## Linked web series
-
-Select **Add series link** in the sidebar and paste a WeebCentral series URL. InkShelf stores series metadata, chapter links, last-read chapter, and reading progress. Its clean reader mode hides the surrounding site interface and leaves the manga pages on an app-themed background. Images remain website-delivered and the persistent WebView cache reuses previously viewed resources; this is not a bulk downloader or permanent offline archive. Internet access may still be required while reading. Use the chapter-list menu to switch between newest-first and oldest-first order, and use the refresh button above the chapter list to fetch newly published chapters. **Appearance → Web reader cache** displays cache usage and can clear cached images without deleting cookies or chapter history. Any CAPTCHA requested by the website still requires manual completion.
+The UI is an original Windows design. No third-party app assets or source code are included.
+Licences for the optional offline components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
